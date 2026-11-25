@@ -98,8 +98,25 @@ def set_limit(db, portfolio_id: int, period_id: int, max_buy_amount=None, max_se
     )
 
 
+def advance_clock(db, portfolio_id: int, to: datetime) -> None:
+    """Move the portfolio's session clock forward to `to` (never backward)."""
+    db.execute(
+        "UPDATE sim_session s SET sim_time = %s FROM portfolio p "
+        "WHERE p.id = %s AND s.id = p.session_id AND s.sim_time < %s",
+        (to, portfolio_id, to),
+    )
+
+
+def set_clock(db, portfolio_id: int, to: datetime) -> None:
+    db.execute(
+        "UPDATE sim_session s SET sim_time = %s FROM portfolio p WHERE p.id = %s AND s.id = p.session_id",
+        (to, portfolio_id),
+    )
+
+
 def make_order(db, portfolio_id: int, asset_id: int, side: str, quantity, placed_at: datetime,
                order_type: str = "market", limit_price=None) -> int:
+    set_clock(db, portfolio_id, placed_at)
     return db.execute(
         "INSERT INTO trade_order (portfolio_id, asset_id, side, order_type, quantity, limit_price, placed_at_sim) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
@@ -109,6 +126,8 @@ def make_order(db, portfolio_id: int, asset_id: int, side: str, quantity, placed
 
 
 def make_fill(db, order_id: int, price, quantity, filled_at: datetime, fee=0) -> int:
+    portfolio_id = db.execute("SELECT portfolio_id FROM trade_order WHERE id = %s", (order_id,)).fetchone()["portfolio_id"]
+    advance_clock(db, portfolio_id, filled_at)
     return db.execute(
         "INSERT INTO fill (order_id, filled_at_sim, price, quantity, fee) VALUES (%s, %s, %s, %s, %s) RETURNING id",
         (order_id, filled_at, Decimal(str(price)), Decimal(str(quantity)), Decimal(str(fee))),

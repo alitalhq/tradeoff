@@ -136,3 +136,47 @@ def test_replay_sim_time_outside_range_rejected(db):
     user = make_user(db)
     with pytest.raises(psycopg.errors.CheckViolation):
         make_session(db, user, T0, end=T0 + timedelta(days=10), sim_time=T0 + timedelta(days=11))
+
+
+def test_tiny_buy_rounds_cost_up(db, setup):
+    buy(db, setup["portfolio"], setup["asset"], "0.0001", "1", T0)
+    assert cash(db, setup["portfolio"]) == Decimal("9999.99")
+
+
+def test_tiny_sell_rounds_proceeds_down(db, setup):
+    buy(db, setup["portfolio"], setup["asset"], 1, "1", T0)
+    sell(db, setup["portfolio"], setup["asset"], "0.0001", "1", T0)
+    assert cash(db, setup["portfolio"]) == Decimal("9999.00")
+
+
+def test_order_must_be_placed_at_session_clock(db, setup):
+    with pytest.raises(psycopg.errors.RaiseException, match="order_time_mismatch"):
+        db.execute(
+            "INSERT INTO trade_order (portfolio_id, asset_id, side, quantity, placed_at_sim) "
+            "VALUES (%s, %s, 'buy', 1, %s)",
+            (setup["portfolio"], setup["asset"], T0 - timedelta(days=1)),
+        )
+
+
+def test_order_outside_any_period_rejected_when_periods_exist(db, setup):
+    _two_periods(db, setup)
+    with pytest.raises(psycopg.errors.RaiseException, match="no_trading_period"):
+        make_order(db, setup["portfolio"], setup["asset"], "buy", 1, T0 + timedelta(days=40))
+
+
+def test_fill_cannot_be_after_session_clock(db, setup):
+    order = make_order(db, setup["portfolio"], setup["asset"], "buy", 1, T0)
+    with pytest.raises(psycopg.errors.RaiseException, match="fill_time_invalid"):
+        db.execute(
+            "INSERT INTO fill (order_id, filled_at_sim, price, quantity) VALUES (%s, %s, 10, 1)",
+            (order, T0 + timedelta(days=1)),
+        )
+
+
+def test_fill_cannot_precede_order(db, setup):
+    order = make_order(db, setup["portfolio"], setup["asset"], "buy", 1, T0 + timedelta(days=1))
+    with pytest.raises(psycopg.errors.RaiseException, match="fill_time_invalid"):
+        db.execute(
+            "INSERT INTO fill (order_id, filled_at_sim, price, quantity) VALUES (%s, %s, 10, 1)",
+            (order, T0),
+        )

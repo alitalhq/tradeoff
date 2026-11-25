@@ -133,16 +133,32 @@ LANGUAGE plpgsql AS $$
 DECLARE
     lim        period_limit;
     period     trading_period;
+    clock      timestamptz;
+    sess_id    bigint;
     used       integer;
 BEGIN
+    -- Serialize order placement per portfolio so concurrent inserts cannot both pass the count.
+    SELECT p.session_id INTO sess_id FROM portfolio p WHERE p.id = NEW.portfolio_id FOR UPDATE;
+    SELECT sim_time INTO clock FROM sim_session WHERE id = sess_id;
+
+    -- Orders are stamped with the session clock; back- or forward-dating would dodge period limits.
+    IF NEW.placed_at_sim <> clock THEN
+        RAISE EXCEPTION 'order_time_mismatch' USING ERRCODE = 'P0001';
+    END IF;
+
+    -- Fail closed: once a session has trading periods, every order must fall inside one.
+    IF EXISTS (SELECT 1 FROM trading_period WHERE session_id = sess_id)
+       AND NOT EXISTS (SELECT 1 FROM trading_period
+                       WHERE session_id = sess_id
+                         AND NEW.placed_at_sim >= starts_at AND NEW.placed_at_sim < ends_at) THEN
+        RAISE EXCEPTION 'no_trading_period' USING ERRCODE = 'P0001';
+    END IF;
+
     lim := period_limit_for(NEW.portfolio_id, NEW.placed_at_sim);
     IF lim.id IS NULL OR lim.max_orders IS NULL THEN
         RETURN NEW;
     END IF;
     SELECT * INTO period FROM trading_period WHERE id = lim.period_id;
-
-    -- Serialize order placement per portfolio so concurrent inserts cannot both pass the count.
-    PERFORM 1 FROM portfolio WHERE id = NEW.portfolio_id FOR UPDATE;
 
     SELECT count(*) INTO used
     FROM trade_order
@@ -169,12 +185,24 @@ DECLARE
     period   trading_period;
     held     numeric;
     used     numeric;
-    notional numeric := NEW.price * NEW.quantity;
+    clock    timestamptz;
+    notional numeric;
 BEGIN
     SELECT * INTO ord FROM trade_order WHERE id = NEW.order_id;
 
     -- Row lock on the portfolio serializes all fills of one portfolio.
     PERFORM 1 FROM portfolio WHERE id = ord.portfolio_id FOR UPDATE;
+
+    SELECT s.sim_time INTO clock
+    FROM portfolio p JOIN sim_session s ON s.id = p.session_id
+    WHERE p.id = ord.portfolio_id;
+    IF NEW.filled_at_sim < ord.placed_at_sim OR NEW.filled_at_sim > clock THEN
+        RAISE EXCEPTION 'fill_time_invalid' USING ERRCODE = 'P0001';
+    END IF;
+
+    -- Cash is kept in cents: round buys up and sells down so tiny trades are never free.
+    notional := CASE WHEN ord.side = 'buy' THEN ceil(NEW.price * NEW.quantity * 100) / 100
+                     ELSE floor(NEW.price * NEW.quantity * 100) / 100 END;
 
     IF ord.status <> 'pending' THEN
         RAISE EXCEPTION 'order_not_pending' USING ERRCODE = 'P0001';
