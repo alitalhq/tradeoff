@@ -130,6 +130,41 @@ CREATE INDEX agent_decision_competitor_idx ON agent_decision (competitor_id, sim
 ALTER TABLE trade_order
     ADD CONSTRAINT trade_order_decision_fk FOREIGN KEY (decision_id) REFERENCES agent_decision (id);
 
+-- An order may only cite a decision made for its own portfolio.
+CREATE FUNCTION order_decision_check() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.decision_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM agent_decision d JOIN competitor c ON c.id = d.competitor_id
+        WHERE d.id = NEW.decision_id AND c.portfolio_id = NEW.portfolio_id
+    ) THEN
+        RAISE EXCEPTION 'decision_portfolio_mismatch' USING ERRCODE = 'P0001';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_order_decision_check
+    BEFORE INSERT OR UPDATE OF decision_id, portfolio_id ON trade_order
+    FOR EACH ROW EXECUTE FUNCTION order_decision_check();
+
+-- Model and owner are frozen once an agent has entered a competition, so the
+-- one-agent-per-user rule and the contamination flag cannot be bypassed afterwards.
+CREATE FUNCTION agent_lock_check() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF (NEW.model_id <> OLD.model_id OR NEW.owner_user_id <> OLD.owner_user_id)
+       AND EXISTS (SELECT 1 FROM competitor WHERE agent_id = OLD.id) THEN
+        RAISE EXCEPTION 'agent_locked_in_competition' USING ERRCODE = 'P0001';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_agent_lock_check
+    BEFORE UPDATE OF model_id, owner_user_id ON agent
+    FOR EACH ROW EXECUTE FUNCTION agent_lock_check();
+
 CREATE TABLE agent_lesson (
     id                 bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     agent_id           bigint      NOT NULL REFERENCES agent (id) ON DELETE CASCADE,
@@ -155,6 +190,24 @@ CREATE TABLE trade_review (
     created_at    timestamptz   NOT NULL DEFAULT now(),
     CHECK (open_fill_id <> close_fill_id)
 );
+
+-- Both fills must come from orders of the reviewed portfolio and asset.
+CREATE FUNCTION trade_review_check() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF (SELECT count(*) FROM fill f JOIN trade_order o ON o.id = f.order_id
+        WHERE f.id IN (NEW.open_fill_id, NEW.close_fill_id)
+          AND o.portfolio_id = NEW.portfolio_id
+          AND o.asset_id = NEW.asset_id) <> 2 THEN
+        RAISE EXCEPTION 'review_fill_mismatch' USING ERRCODE = 'P0001';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_trade_review_check
+    BEFORE INSERT OR UPDATE ON trade_review
+    FOR EACH ROW EXECUTE FUNCTION trade_review_check();
 
 CREATE TABLE trade_review_news (
     review_id bigint NOT NULL REFERENCES trade_review (id) ON DELETE CASCADE,

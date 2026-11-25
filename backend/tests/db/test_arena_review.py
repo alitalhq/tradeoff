@@ -86,3 +86,35 @@ def test_agent_portfolio_must_not_have_user(db, arena):
     with pytest.raises(psycopg.errors.RaiseException, match="competitor_owner_invalid"):
         add_competitor(db, arena["competition"], arena["session"], agent_id=arena["agent"],
                        user_id=arena["owner"])
+
+
+def test_agent_model_locked_while_competing(db, arena):
+    add_competitor(db, arena["competition"], arena["session"], agent_id=arena["agent"])
+    other_model = make_model(db, cutoff="2026-01-01")
+    with pytest.raises(psycopg.errors.RaiseException, match="agent_locked_in_competition"):
+        db.execute("UPDATE agent SET model_id = %s WHERE id = %s", (other_model, arena["agent"]))
+
+
+def test_order_decision_must_belong_to_same_portfolio(db, arena):
+    from tests.factories import make_order, make_portfolio
+    competitor = add_competitor(db, arena["competition"], arena["session"], agent_id=arena["agent"])
+    decision = _decision(db, competitor, T0, T0)
+    foreign_portfolio = make_portfolio(db, arena["session"], arena["owner"])
+    order = make_order(db, foreign_portfolio, make_asset(db), "buy", 1, T0)
+    with pytest.raises(psycopg.errors.RaiseException, match="decision_portfolio_mismatch"):
+        db.execute("UPDATE trade_order SET decision_id = %s WHERE id = %s", (decision, order))
+
+
+def test_review_fills_must_belong_to_portfolio_and_asset(db, arena):
+    from tests.factories import buy, make_portfolio, sell
+    mine = make_portfolio(db, arena["session"], arena["owner"])
+    other_user = make_user(db)
+    theirs = make_portfolio(db, arena["session"], other_user)
+    asset = make_asset(db)
+    open_order = buy(db, mine, asset, 1, "10", T0)
+    foreign_order = buy(db, theirs, asset, 1, "10", T0)
+    fill_of = lambda o: db.execute("SELECT id FROM fill WHERE order_id = %s", (o,)).fetchone()["id"]
+    sql = ("INSERT INTO trade_review (portfolio_id, asset_id, open_fill_id, close_fill_id, review_type, pnl, body) "
+           "VALUES (%s, %s, %s, %s, 'rule', 0, 'x')")
+    with pytest.raises(psycopg.errors.RaiseException, match="review_fill_mismatch"):
+        db.execute(sql, (mine, asset, fill_of(open_order), fill_of(foreign_order)))
