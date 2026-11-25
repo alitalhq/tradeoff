@@ -38,15 +38,17 @@ def create_session(body: SessionCreate, user_id: int = Depends(get_current_user)
     conn.execute("INSERT INTO portfolio (session_id, user_id) VALUES (%s, %s)", (session_id, user_id))
 
     if body.period_length_days and body.end_at:
-        step = timedelta(days=body.period_length_days)
-        starts, number = body.start_at, 1
-        while starts < body.end_at:
-            ends = min(starts + step, body.end_at)
-            conn.execute(
-                "INSERT INTO trading_period (session_id, period_no, starts_at, ends_at) VALUES (%s, %s, %s, %s)",
-                (session_id, number, starts, ends),
-            )
-            starts, number = ends, number + 1
+        # Bounded by SessionCreate validation (MAX_PERIODS); the last period is cut at end_at.
+        conn.execute(
+            """
+            INSERT INTO trading_period (session_id, period_no, starts_at, ends_at)
+            SELECT %(sid)s, n + 1, %(start)s + n * %(step)s, least(%(start)s + (n + 1) * %(step)s, %(end)s)
+            FROM generate_series(0, ceil(extract(epoch FROM %(end)s - %(start)s)
+                                         / extract(epoch FROM %(step)s))::int - 1) AS n
+            """,
+            {"sid": session_id, "start": body.start_at, "end": body.end_at,
+             "step": timedelta(days=body.period_length_days)},
+        )
     return load_session(conn, session_id, user_id)
 
 

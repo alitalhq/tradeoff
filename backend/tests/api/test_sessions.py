@@ -47,3 +47,24 @@ def test_prod_without_auth_returns_501(client, auth, monkeypatch):
     finally:
         monkeypatch.undo()
         get_settings.cache_clear()
+
+
+def test_too_many_periods_rejected(client, auth):
+    r = client.post("/api/sessions", json=replay_payload(end_at="2100-01-01T00:00:00Z", period_length_days=1),
+                    headers=auth)
+    assert r.status_code == 422
+
+
+def test_replay_span_capped(client, auth):
+    r = client.post("/api/sessions", json=replay_payload(end_at="2040-01-01T00:00:00Z", period_length_days=None),
+                    headers=auth)
+    assert r.status_code == 422
+
+
+def test_last_period_truncated_to_end(client, auth, committed):
+    body = client.post("/api/sessions", json=replay_payload(end_at="2019-01-25T21:00:00Z"), headers=auth).json()
+    rows = committed.execute(
+        "SELECT period_no, ends_at FROM trading_period WHERE session_id = %s ORDER BY period_no", (body["id"],)
+    ).fetchall()
+    assert [r["period_no"] for r in rows] == [1, 2]
+    assert rows[-1]["ends_at"].isoformat() == "2019-01-25T21:00:00+00:00"

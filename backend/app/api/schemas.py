@@ -8,6 +8,9 @@ from app.types import Money
 
 Timeframe = Literal["1m", "1h", "1d"]
 
+MAX_REPLAY_DAYS = 366 * 12
+MAX_PERIODS = 1000
+
 
 class SessionCreate(BaseModel):
     mode: Literal["live", "replay"]
@@ -22,6 +25,12 @@ class SessionCreate(BaseModel):
     def check_range(self):
         if self.mode == "replay" and (self.end_at is None or self.end_at <= self.start_at):
             raise ValueError("replay sessions need end_at after start_at")
+        if self.end_at is not None:
+            span_days = (self.end_at - self.start_at).total_seconds() / 86400
+            if span_days > MAX_REPLAY_DAYS:
+                raise ValueError(f"sessions can span at most {MAX_REPLAY_DAYS} days")
+            if self.period_length_days and span_days / self.period_length_days > MAX_PERIODS:
+                raise ValueError(f"a session can have at most {MAX_PERIODS} trading periods")
         return self
 
 
