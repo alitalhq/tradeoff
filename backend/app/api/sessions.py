@@ -23,6 +23,10 @@ def load_session(conn: psycopg.Connection, session_id: int, user_id: int) -> dic
     row = conn.execute(SESSION_SQL, (session_id, user_id)).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="session not found")
+    row["periods"] = conn.execute(
+        "SELECT period_no, starts_at, ends_at FROM trading_period WHERE session_id = %s ORDER BY period_no",
+        (session_id,),
+    ).fetchall()
     return row
 
 

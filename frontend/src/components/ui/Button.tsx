@@ -1,22 +1,36 @@
 import type { ButtonHTMLAttributes } from "react";
 
-type Variant = "primary" | "ghost" | "danger";
+type Variant = "primary" | "quiet" | "danger";
+type Size = "md" | "sm";
 
-const styles: Record<Variant, string> = {
-  primary: "bg-accent text-white hover:opacity-90",
-  ghost: "bg-transparent text-text hover:bg-border/60",
-  danger: "bg-loss text-white hover:opacity-90",
+const variants: Record<Variant, string> = {
+  primary: "bg-accent text-on-accent hover:brightness-110",
+  quiet: "bg-transparent text-ink hover:bg-rule/60",
+  danger: "bg-loss text-white hover:brightness-110",
+};
+
+const sizes: Record<Size, string> = {
+  md: "min-h-10 px-4 text-sm",
+  sm: "min-h-8 px-3 text-xs",
 };
 
 export function Button({
   variant = "primary",
+  size = "md",
+  busy = false,
   className = "",
+  children,
+  disabled,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; busy?: boolean }) {
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${styles[variant]} ${className}`}
+      className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-md font-medium transition-[filter,background-color] duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${sizes[size]} ${className}`}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
       {...props}
-    />
+    >
+      {children}
+    </button>
   );
 }

@@ -34,6 +34,12 @@ class SessionCreate(BaseModel):
         return self
 
 
+class PeriodOut(BaseModel):
+    period_no: int
+    starts_at: datetime
+    ends_at: datetime
+
+
 class SessionOut(BaseModel):
     id: int
     mode: str
@@ -46,6 +52,7 @@ class SessionOut(BaseModel):
     initial_cash: Money
     period_length_days: int | None
     portfolio_id: int
+    periods: list[PeriodOut]
 
 
 class PositionOut(BaseModel):

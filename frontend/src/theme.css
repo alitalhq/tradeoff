@@ -1,54 +1,80 @@
 @import "tailwindcss";
 
+/* Tokens: ledger-paper neutrals, ink text, one indigo accent, gain/loss that never stand alone. */
 @theme {
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-border: var(--border);
-  --color-text: var(--text);
+  --color-paper: var(--paper);
+  --color-raised: var(--raised);
+  --color-rule: var(--rule);
+  --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
   --color-gain: var(--gain);
   --color-loss: var(--loss);
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 :root {
-  --surface: #f7f8fa;
-  --surface-raised: #ffffff;
-  --border: #e2e5ea;
-  --text: #15181d;
-  --muted: #5d6673;
-  --accent: #2f6fed;
-  --gain: #128a55;
-  --loss: #d23c3c;
+  color-scheme: light;
+  --paper: #eef1f4;
+  --raised: #ffffff;
+  --rule: #d3d9e0;
+  --ink: #1b2430;
+  --muted: #56606d;
+  --accent: #3b4bc8;
+  --on-accent: #ffffff;
+  --gain: #0f7b5f;
+  --loss: #c2412d;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --surface: #0f1216;
-    --surface-raised: #171b21;
-    --border: #262c35;
-    --text: #e6e9ee;
-    --muted: #8a94a3;
-    --accent: #5b8ff9;
-    --gain: #2fbf7f;
-    --loss: #f05d5d;
+    color-scheme: dark;
+    --paper: #12161c;
+    --raised: #1a2028;
+    --rule: #2c3440;
+    --ink: #e4e8ee;
+    --muted: #9aa4b2;
+    --accent: #8b97ff;
+    --on-accent: #12161c;
+    --gain: #3cc79a;
+    --loss: #f07a62;
   }
 }
 
 :root[data-theme="dark"] {
-  --surface: #0f1216;
-  --surface-raised: #171b21;
-  --border: #262c35;
-  --text: #e6e9ee;
-  --muted: #8a94a3;
-  --accent: #5b8ff9;
-  --gain: #2fbf7f;
-  --loss: #f05d5d;
+  color-scheme: dark;
+  --paper: #12161c;
+  --raised: #1a2028;
+  --rule: #2c3440;
+  --ink: #e4e8ee;
+  --muted: #9aa4b2;
+  --accent: #8b97ff;
+  --on-accent: #12161c;
+  --gain: #3cc79a;
+  --loss: #f07a62;
 }
 
 body {
-  background: var(--surface);
-  color: var(--text);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
