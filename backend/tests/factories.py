@@ -56,3 +56,72 @@ def make_news(db, published_at: datetime, asset_ids: list[int], headline: str = 
     for asset_id in asset_ids:
         db.execute("INSERT INTO news_asset (news_id, asset_id) VALUES (%s, %s)", (news_id, asset_id))
     return news_id
+
+
+def make_session(db, user_id: int, start: datetime, end: datetime | None = None,
+                 sim_time: datetime | None = None, mode: str = "replay", initial_cash=10000,
+                 bar_timeframe: str = "1d", period_length_days: int | None = None) -> int:
+    end = end if end is not None else (start + timedelta(days=365) if mode == "replay" else None)
+    return db.execute(
+        "INSERT INTO sim_session (owner_user_id, mode, bar_timeframe, start_at, end_at, sim_time, "
+        "status, initial_cash, period_length_days) "
+        "VALUES (%s, %s, %s, %s, %s, %s, 'running', %s, %s) RETURNING id",
+        (user_id, mode, bar_timeframe, start, end, sim_time or start, Decimal(str(initial_cash)),
+         period_length_days),
+    ).fetchone()["id"]
+
+
+def make_period(db, session_id: int, period_no: int, starts_at: datetime, ends_at: datetime) -> int:
+    return db.execute(
+        "INSERT INTO trading_period (session_id, period_no, starts_at, ends_at) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (session_id, period_no, starts_at, ends_at),
+    ).fetchone()["id"]
+
+
+def make_portfolio(db, session_id: int, user_id: int | None) -> int:
+    return db.execute(
+        "INSERT INTO portfolio (session_id, user_id) VALUES (%s, %s) RETURNING id",
+        (session_id, user_id),
+    ).fetchone()["id"]
+
+
+def set_limit(db, portfolio_id: int, period_id: int, max_buy_amount=None, max_sell_amount=None,
+              max_orders: int | None = None) -> None:
+    db.execute(
+        "INSERT INTO period_limit (portfolio_id, period_id, max_buy_amount, max_sell_amount, max_orders) "
+        "VALUES (%s, %s, %s, %s, %s)",
+        (portfolio_id, period_id,
+         None if max_buy_amount is None else Decimal(str(max_buy_amount)),
+         None if max_sell_amount is None else Decimal(str(max_sell_amount)),
+         max_orders),
+    )
+
+
+def make_order(db, portfolio_id: int, asset_id: int, side: str, quantity, placed_at: datetime,
+               order_type: str = "market", limit_price=None) -> int:
+    return db.execute(
+        "INSERT INTO trade_order (portfolio_id, asset_id, side, order_type, quantity, limit_price, placed_at_sim) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (portfolio_id, asset_id, side, order_type, Decimal(str(quantity)),
+         None if limit_price is None else Decimal(str(limit_price)), placed_at),
+    ).fetchone()["id"]
+
+
+def make_fill(db, order_id: int, price, quantity, filled_at: datetime, fee=0) -> int:
+    return db.execute(
+        "INSERT INTO fill (order_id, filled_at_sim, price, quantity, fee) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (order_id, filled_at, Decimal(str(price)), Decimal(str(quantity)), Decimal(str(fee))),
+    ).fetchone()["id"]
+
+
+def buy(db, portfolio_id: int, asset_id: int, quantity, price, at: datetime, fee=0) -> int:
+    order = make_order(db, portfolio_id, asset_id, "buy", quantity, at)
+    make_fill(db, order, price, quantity, at, fee)
+    return order
+
+
+def sell(db, portfolio_id: int, asset_id: int, quantity, price, at: datetime, fee=0) -> int:
+    order = make_order(db, portfolio_id, asset_id, "sell", quantity, at)
+    make_fill(db, order, price, quantity, at, fee)
+    return order
