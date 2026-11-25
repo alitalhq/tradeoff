@@ -188,10 +188,12 @@ DECLARE
     clock    timestamptz;
     notional numeric;
 BEGIN
+    -- Row lock on the portfolio serializes all fills of one portfolio; the order is
+    -- re-read after the lock so a concurrent fill's status change is visible.
+    PERFORM 1 FROM portfolio
+    WHERE id = (SELECT portfolio_id FROM trade_order WHERE id = NEW.order_id)
+    FOR UPDATE;
     SELECT * INTO ord FROM trade_order WHERE id = NEW.order_id;
-
-    -- Row lock on the portfolio serializes all fills of one portfolio.
-    PERFORM 1 FROM portfolio WHERE id = ord.portfolio_id FOR UPDATE;
 
     SELECT s.sim_time INTO clock
     FROM portfolio p JOIN sim_session s ON s.id = p.session_id
