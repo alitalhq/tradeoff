@@ -125,3 +125,45 @@ def sell(db, portfolio_id: int, asset_id: int, quantity, price, at: datetime, fe
     order = make_order(db, portfolio_id, asset_id, "sell", quantity, at)
     make_fill(db, order, price, quantity, at, fee)
     return order
+
+
+def make_model(db, provider: str = "Anthropic", code: str | None = None, cutoff: str = "2025-01-01") -> int:
+    provider_id = db.execute("SELECT id FROM llm_provider WHERE name = %s", (provider,)).fetchone()["id"]
+    return db.execute(
+        "INSERT INTO llm_model (provider_id, model_code, knowledge_cutoff) VALUES (%s, %s, %s) RETURNING id",
+        (provider_id, code or f"model-{_next()}", cutoff),
+    ).fetchone()["id"]
+
+
+def make_credential(db, user_id: int, provider: str = "Anthropic") -> int:
+    provider_id = db.execute("SELECT id FROM llm_provider WHERE name = %s", (provider,)).fetchone()["id"]
+    return db.execute(
+        "INSERT INTO user_api_credential (user_id, provider_id, encrypted_key, key_last4) "
+        "VALUES (%s, %s, '\\x00', 'abcd') RETURNING id",
+        (user_id, provider_id),
+    ).fetchone()["id"]
+
+
+def make_agent(db, owner_id: int, model_id: int, credential_id: int) -> int:
+    return db.execute(
+        "INSERT INTO agent (owner_user_id, name, model_id, credential_id, strategy_prompt) "
+        "VALUES (%s, %s, %s, %s, 'Buy quality.') RETURNING id",
+        (owner_id, f"agent-{_next()}", model_id, credential_id),
+    ).fetchone()["id"]
+
+
+def make_competition(db, creator_id: int, session_id: int, anonymized: bool = True) -> int:
+    return db.execute(
+        "INSERT INTO competition (created_by, session_id, anonymized, decision_interval) "
+        "VALUES (%s, %s, %s, interval '1 day') RETURNING id",
+        (creator_id, session_id, anonymized),
+    ).fetchone()["id"]
+
+
+def add_competitor(db, competition_id: int, session_id: int, agent_id: int | None = None,
+                   user_id: int | None = None) -> int:
+    portfolio = make_portfolio(db, session_id, user_id)
+    return db.execute(
+        "INSERT INTO competitor (competition_id, portfolio_id, agent_id) VALUES (%s, %s, %s) RETURNING id",
+        (competition_id, portfolio, agent_id),
+    ).fetchone()["id"]
