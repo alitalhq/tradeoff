@@ -311,6 +311,31 @@
         "title": "PeriodLimitIn",
         "type": "object"
       },
+      "PeriodOut": {
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "period_no": {
+            "title": "Period No",
+            "type": "integer"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period_no",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "PeriodOut",
+        "type": "object"
+      },
       "PortfolioOut": {
         "properties": {
           "cash": {
@@ -501,6 +526,13 @@
             ],
             "title": "Period Length Days"
           },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodOut"
+            },
+            "title": "Periods",
+            "type": "array"
+          },
           "portfolio_id": {
             "title": "Portfolio Id",
             "type": "integer"
@@ -535,7 +567,8 @@
           "status",
           "initial_cash",
           "period_length_days",
-          "portfolio_id"
+          "portfolio_id",
+          "periods"
         ],
         "title": "SessionOut",
         "type": "object"

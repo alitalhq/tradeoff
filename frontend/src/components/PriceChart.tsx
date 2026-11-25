@@ -42,8 +42,8 @@ export function PriceChart({ bars, markers = [], height = 360 }: PriceChartProps
     chart.current = createChart(container.current, {
       height,
       autoSize: true,
-      layout: { background: { color: "transparent" }, textColor: cssVar("--muted", "#5d6673") },
-      grid: { vertLines: { visible: false }, horzLines: { color: cssVar("--border", "#e2e5ea") } },
+      layout: { background: { color: "transparent" }, textColor: cssVar("--muted", "#56606d") },
+      grid: { vertLines: { visible: false }, horzLines: { color: cssVar("--rule", "#d3d9e0") } },
     });
     series.current = chart.current.addSeries(CandlestickSeries, {
       upColor: cssVar("--gain", "#128a55"),

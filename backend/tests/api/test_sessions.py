@@ -68,3 +68,9 @@ def test_last_period_truncated_to_end(client, auth, committed):
     ).fetchall()
     assert [r["period_no"] for r in rows] == [1, 2]
     assert rows[-1]["ends_at"].isoformat() == "2019-01-25T21:00:00+00:00"
+
+
+def test_session_lists_its_trading_periods(client, auth, session_id):
+    periods = client.get(f"/api/sessions/{session_id}", headers=auth).json()["periods"]
+    assert [p["period_no"] for p in periods] == [1, 2]
+    assert periods[0]["starts_at"] == "2019-01-02T21:00:00Z"

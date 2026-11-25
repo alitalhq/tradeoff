@@ -282,6 +282,21 @@ export interface components {
             /** Max Sell Amount */
             max_sell_amount?: number | string | null;
         };
+        /** PeriodOut */
+        PeriodOut: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Period No */
+            period_no: number;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+        };
         /** PortfolioOut */
         PortfolioOut: {
             /** Cash */
@@ -348,6 +363,8 @@ export interface components {
             mode: string;
             /** Period Length Days */
             period_length_days: number | null;
+            /** Periods */
+            periods: components["schemas"]["PeriodOut"][];
             /** Portfolio Id */
             portfolio_id: number;
             /**
