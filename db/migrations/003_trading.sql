@@ -24,6 +24,21 @@ CREATE TABLE sim_session (
     CHECK (mode <> 'replay' OR (end_at IS NOT NULL AND sim_time BETWEEN start_at AND end_at))
 );
 
+-- The session clock only moves forward; rewinding would let a viewer act on prices already seen.
+CREATE FUNCTION session_clock_forward() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.sim_time < OLD.sim_time THEN
+        RAISE EXCEPTION 'clock_moved_backwards' USING ERRCODE = 'P0001';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_session_clock_forward
+    BEFORE UPDATE OF sim_time ON sim_session
+    FOR EACH ROW EXECUTE FUNCTION session_clock_forward();
+
 CREATE TABLE trading_period (
     id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     session_id bigint      NOT NULL REFERENCES sim_session (id) ON DELETE CASCADE,
@@ -93,6 +108,27 @@ CREATE TABLE trade_order (
 
 CREATE INDEX trade_order_portfolio_idx ON trade_order (portfolio_id, placed_at_sim);
 CREATE INDEX trade_order_pending_idx ON trade_order (portfolio_id) WHERE status = 'pending';
+
+-- Orders are frozen once placed; only the status moves, and only out of 'pending'.
+CREATE FUNCTION order_update_check() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF (NEW.portfolio_id, NEW.asset_id, NEW.side, NEW.order_type, NEW.quantity, NEW.placed_at_sim)
+           IS DISTINCT FROM (OLD.portfolio_id, OLD.asset_id, OLD.side, OLD.order_type, OLD.quantity, OLD.placed_at_sim)
+       OR NEW.limit_price IS DISTINCT FROM OLD.limit_price
+       OR (OLD.decision_id IS NOT NULL AND NEW.decision_id IS DISTINCT FROM OLD.decision_id) THEN
+        RAISE EXCEPTION 'order_immutable' USING ERRCODE = 'P0001';
+    END IF;
+    IF NEW.status <> OLD.status AND OLD.status <> 'pending' THEN
+        RAISE EXCEPTION 'invalid_order_transition' USING ERRCODE = 'P0001';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_order_update_check
+    BEFORE UPDATE ON trade_order
+    FOR EACH ROW EXECUTE FUNCTION order_update_check();
 
 -- Append-only ledger. Positions and realized results are derived from it.
 CREATE TABLE fill (

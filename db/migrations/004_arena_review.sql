@@ -63,8 +63,9 @@ DECLARE
     cutoff     date;
     session_start timestamptz;
 BEGIN
+    -- Lock the competition so concurrent entries see each other (one_agent_per_user check below).
+    SELECT * INTO comp FROM competition WHERE id = NEW.competition_id FOR UPDATE;
     SELECT * INTO pf FROM portfolio WHERE id = NEW.portfolio_id;
-    SELECT * INTO comp FROM competition WHERE id = NEW.competition_id;
 
     IF pf.session_id <> comp.session_id THEN
         RAISE EXCEPTION 'competitor_session_mismatch' USING ERRCODE = 'P0001';
@@ -90,7 +91,7 @@ BEGIN
         END IF;
 
         SELECT start_at INTO session_start FROM sim_session WHERE id = comp.session_id;
-        IF cutoff >= session_start::date THEN
+        IF cutoff >= (session_start AT TIME ZONE 'UTC')::date THEN
             UPDATE competition SET contaminated = true WHERE id = comp.id;
         END IF;
     END IF;
@@ -124,6 +125,26 @@ CREATE TABLE agent_decision (
     created_at        timestamptz NOT NULL DEFAULT now(),
     CHECK (context_max_ts <= sim_time)
 );
+
+-- sim_time is not self-reported: it must be the session clock at the moment of the decision.
+CREATE FUNCTION decision_time_check() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.sim_time IS DISTINCT FROM (
+        SELECT s.sim_time FROM competitor c
+        JOIN portfolio p ON p.id = c.portfolio_id
+        JOIN sim_session s ON s.id = p.session_id
+        WHERE c.id = NEW.competitor_id
+    ) THEN
+        RAISE EXCEPTION 'decision_time_mismatch' USING ERRCODE = 'P0001';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_decision_time_check
+    BEFORE INSERT OR UPDATE ON agent_decision
+    FOR EACH ROW EXECUTE FUNCTION decision_time_check();
 
 CREATE INDEX agent_decision_competitor_idx ON agent_decision (competitor_id, sim_time);
 

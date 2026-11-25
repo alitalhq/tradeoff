@@ -180,3 +180,21 @@ def test_fill_cannot_precede_order(db, setup):
             "INSERT INTO fill (order_id, filled_at_sim, price, quantity) VALUES (%s, %s, 10, 1)",
             (order, T0),
         )
+
+
+def test_session_clock_cannot_move_backwards(db, setup):
+    db.execute("UPDATE sim_session SET sim_time = %s WHERE id = %s", (T0 + timedelta(days=2), setup["session"]))
+    with pytest.raises(psycopg.errors.RaiseException, match="clock_moved_backwards"):
+        db.execute("UPDATE sim_session SET sim_time = %s WHERE id = %s", (T0 + timedelta(days=1), setup["session"]))
+
+
+def test_order_core_columns_are_frozen(db, setup):
+    order = make_order(db, setup["portfolio"], setup["asset"], "buy", 1, T0)
+    with pytest.raises(psycopg.errors.RaiseException, match="order_immutable"):
+        db.execute("UPDATE trade_order SET placed_at_sim = %s WHERE id = %s", (T0 - timedelta(days=1), order))
+
+
+def test_filled_order_cannot_return_to_pending(db, setup):
+    order = buy(db, setup["portfolio"], setup["asset"], 1, "10", T0)
+    with pytest.raises(psycopg.errors.RaiseException, match="invalid_order_transition"):
+        db.execute("UPDATE trade_order SET status = 'pending' WHERE id = %s", (order,))

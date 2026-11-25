@@ -3,7 +3,7 @@ from datetime import timedelta
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.deps import get_conn
+from app.api.deps import Conn
 from app.api.schemas import PeriodLimitIn, PortfolioOut, SessionCreate, SessionOut
 from app.auth.deps import get_current_user
 
@@ -27,7 +27,7 @@ def load_session(conn: psycopg.Connection, session_id: int, user_id: int) -> dic
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=SessionOut)
-def create_session(body: SessionCreate, user_id: int = Depends(get_current_user), conn=Depends(get_conn)):
+def create_session(*, body: SessionCreate, user_id: int = Depends(get_current_user), conn: Conn):
     session_id = conn.execute(
         "INSERT INTO sim_session (owner_user_id, mode, bar_timeframe, start_at, end_at, sim_time, speed, "
         "status, initial_cash, period_length_days) "
@@ -53,12 +53,12 @@ def create_session(body: SessionCreate, user_id: int = Depends(get_current_user)
 
 
 @router.get("/{session_id}", response_model=SessionOut)
-def get_session(session_id: int, user_id: int = Depends(get_current_user), conn=Depends(get_conn)):
+def get_session(*, session_id: int, user_id: int = Depends(get_current_user), conn: Conn):
     return load_session(conn, session_id, user_id)
 
 
 @router.get("/{session_id}/portfolio", response_model=PortfolioOut)
-def get_portfolio(session_id: int, user_id: int = Depends(get_current_user), conn=Depends(get_conn)):
+def get_portfolio(*, session_id: int, user_id: int = Depends(get_current_user), conn: Conn):
     session = load_session(conn, session_id, user_id)
     cash = conn.execute("SELECT cash FROM portfolio WHERE id = %s", (session["portfolio_id"],)).fetchone()["cash"]
     positions = conn.execute(
@@ -72,8 +72,8 @@ def get_portfolio(session_id: int, user_id: int = Depends(get_current_user), con
 
 
 @router.put("/{session_id}/periods/{period_no}/limit", status_code=status.HTTP_204_NO_CONTENT)
-def set_period_limit(session_id: int, period_no: int, body: PeriodLimitIn,
-                     user_id: int = Depends(get_current_user), conn=Depends(get_conn)):
+def set_period_limit(*, session_id: int, period_no: int, body: PeriodLimitIn,
+                     user_id: int = Depends(get_current_user), conn: Conn):
     session = load_session(conn, session_id, user_id)
     period = conn.execute(
         "SELECT id, ends_at FROM trading_period WHERE session_id = %s AND period_no = %s",

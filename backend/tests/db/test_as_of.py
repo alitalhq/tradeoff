@@ -65,9 +65,8 @@ def test_bars_ordered_across_dst(db, ctx):
               datetime(2019, 3, 12, 13, 30, tzinfo=UTC)]
     for i, s in enumerate(starts):
         make_bar(db, ctx["asset"], s, open_=100 + i, length=timedelta(hours=6, minutes=30))
-    db.execute("UPDATE sim_session SET start_at = %s, sim_time = %s WHERE id = %s",
-               (starts[0] - timedelta(days=1), datetime(2019, 3, 13, tzinfo=UTC), ctx["session"]))
-    bars = get_bars(db, ctx["session"], ctx["asset"], "1d", 10)
+    session = make_session(db, make_user(db), starts[0] - timedelta(days=1), sim_time=datetime(2019, 3, 13, tzinfo=UTC))
+    bars = get_bars(db, session, ctx["asset"], "1d", 10)
     assert [b.bar_start for b in bars] == sorted(starts, reverse=True)
 
 

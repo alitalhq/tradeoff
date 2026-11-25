@@ -19,8 +19,8 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql://tradeoff:tradeoff@db:5432/tradeoff
-      APP_ENV: ${APP_ENV:-dev}
-      CREDENTIAL_KEY: ${CREDENTIAL_KEY:-change-me}
+      APP_ENV: ${APP_ENV:-prod}
+      CREDENTIAL_KEY: ${CREDENTIAL_KEY:?set CREDENTIAL_KEY in .env}
     volumes:
       - ./db:/db:ro
     depends_on:

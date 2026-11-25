@@ -118,3 +118,47 @@ def test_review_fills_must_belong_to_portfolio_and_asset(db, arena):
            "VALUES (%s, %s, %s, %s, 'rule', 0, 'x')")
     with pytest.raises(psycopg.errors.RaiseException, match="review_fill_mismatch"):
         db.execute(sql, (mine, asset, fill_of(open_order), fill_of(foreign_order)))
+
+
+def test_decision_time_must_match_session_clock(db, arena):
+    competitor = add_competitor(db, arena["competition"], arena["session"], agent_id=arena["agent"])
+    future = T0 + timedelta(days=30)
+    with pytest.raises(psycopg.errors.RaiseException, match="decision_time_mismatch"):
+        _decision(db, competitor, future, future)
+
+
+def test_one_agent_per_user_holds_under_concurrency(committed, db_dsn):
+    import threading
+    from psycopg.rows import dict_row
+
+    owner = make_user(committed)
+    session = make_session(committed, owner, T0)
+    competition = make_competition(committed, owner, session)
+    model = make_model(committed, cutoff="2018-01-01")
+    credential = make_credential(committed, owner)
+    first, second = (make_agent(committed, owner, model, credential) for _ in range(2))
+    portfolios = [committed.execute("INSERT INTO portfolio (session_id) VALUES (%s) RETURNING id",
+                                    (session,)).fetchone()["id"] for _ in range(2)]
+    sql = "INSERT INTO competitor (competition_id, portfolio_id, agent_id) VALUES (%s, %s, %s)"
+    errors: list[Exception] = []
+
+    with psycopg.connect(db_dsn, row_factory=dict_row) as a:
+        a.execute(sql, (competition, portfolios[0], first))   # uncommitted
+
+        def other():
+            try:
+                with psycopg.connect(db_dsn, row_factory=dict_row) as b:
+                    b.execute(sql, (competition, portfolios[1], second))
+                    b.commit()
+            except psycopg.Error as exc:
+                errors.append(exc)
+
+        thread = threading.Thread(target=other)
+        thread.start()
+        thread.join(timeout=0.5)
+        a.commit()
+        thread.join()
+
+    count = committed.execute("SELECT count(*) AS n FROM competitor WHERE competition_id = %s",
+                              (competition,)).fetchone()["n"]
+    assert count == 1 and len(errors) == 1

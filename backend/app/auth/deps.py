@@ -1,10 +1,10 @@
 from fastapi import Depends, HTTPException, Request
 
-from app.api.deps import get_conn
+from app.api.deps import Conn
 from app.config import get_settings
 
 
-def get_current_user(request: Request, conn=Depends(get_conn)) -> int:
+def get_current_user(request: Request, conn: Conn) -> int:
     """Temporary development auth: trusts X-User-Id only when APP_ENV is explicitly dev or test.
 
     The auth plan replaces this body with real session-cookie auth; the signature stays.
