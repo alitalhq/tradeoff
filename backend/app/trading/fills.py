@@ -74,6 +74,9 @@ def _try_fill(conn: psycopg.Connection, order_id: int, price: Decimal, quantity:
             )
     except psycopg.errors.CheckViolation:
         return "insufficient_cash"
+    except psycopg.errors.DataError:
+        # Notional beyond the cash column's range; one oversized order must not stop the batch.
+        return "order_too_large"
     except psycopg.errors.RaiseException as exc:
         return exc.diag.message_primary or "rejected"
     return None

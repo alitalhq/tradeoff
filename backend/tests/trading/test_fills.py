@@ -99,8 +99,9 @@ def test_buy_beyond_cash_rejected_as_insufficient_cash(db, ctx):
     assert result == FillResult(order_id=order, status="rejected", price=None, reason="insufficient_cash")
 
 
-def test_concurrent_fills_cannot_overdraw(db_dsn):
-    with psycopg.connect(db_dsn, row_factory=dict_row, autocommit=True) as setup:
+def test_concurrent_fills_cannot_overdraw(db_dsn, committed):
+    setup = committed
+    if True:
         user = make_user(setup)
         session = make_session(setup, user, D1 - DAY, sim_time=D1 + DAY)
         portfolio = make_portfolio(setup, session, user)
@@ -132,3 +133,13 @@ def test_concurrent_fills_cannot_overdraw(db_dsn):
         cash = check.execute("SELECT cash FROM portfolio WHERE id = %s", (portfolio,)).fetchone()["cash"]
     assert statuses == ["filled", "rejected"]
     assert cash == Decimal("3000.00")
+
+
+def test_oversized_order_is_rejected_without_blocking_batch(db, ctx):
+    huge = place_order(db, ctx["portfolio"], ctx["asset"], "buy", Decimal("9999999999"))
+    normal = place_order(db, ctx["portfolio"], ctx["asset"], "buy", Decimal("1"))
+    make_bar(db, ctx["asset"], D1 + DAY, open_=1000)
+    advance(db, ctx["session"], D1 + 2 * DAY)
+    results = {r.order_id: r for r in fill_pending_orders(db, ctx["session"])}
+    assert results[huge].status == "rejected" and results[huge].reason == "order_too_large"
+    assert results[normal].status == "filled"
