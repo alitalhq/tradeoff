@@ -52,6 +52,19 @@ def db(db_dsn):
 
 
 @pytest.fixture
+def committed(db_dsn):
+    """Autocommit connection for tests whose data must be visible to other connections.
+
+    Everything except seed rows is truncated afterwards so later tests start clean.
+    """
+    with psycopg.connect(db_dsn, row_factory=dict_row, autocommit=True) as conn:
+        try:
+            yield conn
+        finally:
+            conn.execute("TRUNCATE app_user, sector, news, llm_model RESTART IDENTITY CASCADE")
+
+
+@pytest.fixture
 def tmp_db_conn():
     url = TEST_DATABASE_URL + "_tmp"
     _recreate_database(url)

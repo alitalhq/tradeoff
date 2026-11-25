@@ -1,7 +1,7 @@
 from datetime import datetime
-from decimal import Decimal
-
 from pydantic import BaseModel
+
+from app.types import Money
 
 
 class Bar(BaseModel):
@@ -9,10 +9,10 @@ class Bar(BaseModel):
     timeframe: str
     bar_start: datetime
     bar_end: datetime
-    open: Decimal
-    high: Decimal
-    low: Decimal
-    close: Decimal
+    open: Money
+    high: Money
+    low: Money
+    close: Money
     volume: int
 
 

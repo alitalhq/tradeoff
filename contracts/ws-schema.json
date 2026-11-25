@@ -1,0 +1,285 @@
+{
+  "$defs": {
+    "Bar": {
+      "properties": {
+        "asset_id": {
+          "title": "Asset Id",
+          "type": "integer"
+        },
+        "bar_end": {
+          "format": "date-time",
+          "title": "Bar End",
+          "type": "string"
+        },
+        "bar_start": {
+          "format": "date-time",
+          "title": "Bar Start",
+          "type": "string"
+        },
+        "close": {
+          "title": "Close",
+          "type": "string"
+        },
+        "high": {
+          "title": "High",
+          "type": "string"
+        },
+        "low": {
+          "title": "Low",
+          "type": "string"
+        },
+        "open": {
+          "title": "Open",
+          "type": "string"
+        },
+        "timeframe": {
+          "title": "Timeframe",
+          "type": "string"
+        },
+        "volume": {
+          "title": "Volume",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "asset_id",
+        "timeframe",
+        "bar_start",
+        "bar_end",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume"
+      ],
+      "title": "Bar",
+      "type": "object"
+    },
+    "BarMessage": {
+      "properties": {
+        "asset_id": {
+          "title": "Asset Id",
+          "type": "integer"
+        },
+        "bar": {
+          "$ref": "#/$defs/Bar"
+        },
+        "type": {
+          "const": "bar",
+          "default": "bar",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id",
+        "bar"
+      ],
+      "title": "BarMessage",
+      "type": "object"
+    },
+    "ClockMessage": {
+      "properties": {
+        "sim_time": {
+          "format": "date-time",
+          "title": "Sim Time",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "running",
+            "paused",
+            "finished"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "type": {
+          "const": "clock",
+          "default": "clock",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sim_time",
+        "status"
+      ],
+      "title": "ClockMessage",
+      "type": "object"
+    },
+    "FillMessage": {
+      "properties": {
+        "order_id": {
+          "title": "Order Id",
+          "type": "integer"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Price"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "status": {
+          "enum": [
+            "filled",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "type": {
+          "const": "fill",
+          "default": "fill",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "order_id",
+        "status",
+        "price",
+        "reason"
+      ],
+      "title": "FillMessage",
+      "type": "object"
+    },
+    "NewsItem": {
+      "properties": {
+        "headline": {
+          "title": "Headline",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "published_at": {
+          "format": "date-time",
+          "title": "Published At",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "headline",
+        "summary",
+        "url",
+        "published_at"
+      ],
+      "title": "NewsItem",
+      "type": "object"
+    },
+    "NewsMessage": {
+      "properties": {
+        "item": {
+          "$ref": "#/$defs/NewsItem"
+        },
+        "type": {
+          "const": "news",
+          "default": "news",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item"
+      ],
+      "title": "NewsMessage",
+      "type": "object"
+    },
+    "PeriodMessage": {
+      "properties": {
+        "awaiting_limits": {
+          "title": "Awaiting Limits",
+          "type": "boolean"
+        },
+        "ends_at": {
+          "format": "date-time",
+          "title": "Ends At",
+          "type": "string"
+        },
+        "period_no": {
+          "title": "Period No",
+          "type": "integer"
+        },
+        "starts_at": {
+          "format": "date-time",
+          "title": "Starts At",
+          "type": "string"
+        },
+        "type": {
+          "const": "period",
+          "default": "period",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "period_no",
+        "starts_at",
+        "ends_at",
+        "awaiting_limits"
+      ],
+      "title": "PeriodMessage",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "bar": "#/$defs/BarMessage",
+      "clock": "#/$defs/ClockMessage",
+      "fill": "#/$defs/FillMessage",
+      "news": "#/$defs/NewsMessage",
+      "period": "#/$defs/PeriodMessage"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ClockMessage"
+    },
+    {
+      "$ref": "#/$defs/BarMessage"
+    },
+    {
+      "$ref": "#/$defs/NewsMessage"
+    },
+    {
+      "$ref": "#/$defs/FillMessage"
+    },
+    {
+      "$ref": "#/$defs/PeriodMessage"
+    }
+  ]
+}
