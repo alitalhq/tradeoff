@@ -1,30 +1,35 @@
 from datetime import datetime
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from app.market.models import Bar, NewsItem
 from app.types import Money
 
 
-class ClockMessage(BaseModel):
+class _Message(BaseModel):
+    # Serialized messages always carry their `type`, so the schema marks it required.
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+
+class ClockMessage(_Message):
     type: Literal["clock"] = "clock"
     sim_time: datetime
     status: Literal["created", "running", "paused", "finished"]
 
 
-class BarMessage(BaseModel):
+class BarMessage(_Message):
     type: Literal["bar"] = "bar"
     asset_id: int
     bar: Bar
 
 
-class NewsMessage(BaseModel):
+class NewsMessage(_Message):
     type: Literal["news"] = "news"
     item: NewsItem
 
 
-class FillMessage(BaseModel):
+class FillMessage(_Message):
     type: Literal["fill"] = "fill"
     order_id: int
     status: Literal["filled", "rejected"]
@@ -32,7 +37,7 @@ class FillMessage(BaseModel):
     reason: str | None
 
 
-class PeriodMessage(BaseModel):
+class PeriodMessage(_Message):
     type: Literal["period"] = "period"
     period_no: int
     starts_at: datetime
