@@ -186,3 +186,29 @@ def add_competitor(db, competition_id: int, session_id: int, agent_id: int | Non
         "INSERT INTO competitor (competition_id, portfolio_id, agent_id) VALUES (%s, %s, %s) RETURNING id",
         (competition_id, portfolio, agent_id),
     ).fetchone()["id"]
+
+
+def make_split(db, asset_id: int, effective_at: datetime, ratio) -> int:
+    return db.execute(
+        "INSERT INTO corporate_action (asset_id, action_type, effective_at, ratio) "
+        "VALUES (%s, 'split', %s, %s) RETURNING id",
+        (asset_id, effective_at, Decimal(str(ratio))),
+    ).fetchone()["id"]
+
+
+def make_dividend(db, asset_id: int, effective_at: datetime, amount) -> int:
+    return db.execute(
+        "INSERT INTO corporate_action (asset_id, action_type, effective_at, amount) "
+        "VALUES (%s, 'dividend', %s, %s) RETURNING id",
+        (asset_id, effective_at, Decimal(str(amount))),
+    ).fetchone()["id"]
+
+
+def add_session_asset(db, session_id: int, asset_id: int) -> None:
+    db.execute("INSERT INTO session_asset (session_id, asset_id) VALUES (%s, %s)", (session_id, asset_id))
+
+
+def apply_actions(db, session_id: int, start: datetime, end: datetime) -> list[dict]:
+    """Move the session clock to `end` and apply the corporate actions in (start, end]."""
+    db.execute("UPDATE sim_session SET sim_time = %s WHERE id = %s AND sim_time < %s", (end, session_id, end))
+    return db.execute("SELECT * FROM apply_corporate_actions(%s, %s, %s)", (session_id, start, end)).fetchall()

@@ -10,6 +10,8 @@ Timeframe = Literal["1m", "1h", "1d"]
 
 MAX_REPLAY_DAYS = 366 * 12
 MAX_PERIODS = 1000
+MAX_SESSION_ASSETS = 200
+MIN_SPEED, MAX_SPEED = Decimal("0.1"), Decimal("20")
 
 
 class SessionCreate(BaseModel):
@@ -19,7 +21,9 @@ class SessionCreate(BaseModel):
     end_at: AwareDatetime | None = None
     initial_cash: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     period_length_days: int | None = Field(default=None, gt=0)
-    speed: Decimal = Field(default=Decimal("1"), gt=0)
+    speed: Decimal = Field(default=Decimal("1"), ge=MIN_SPEED, le=MAX_SPEED, decimal_places=2)
+    # Assets the session trades; omitted or empty means every asset.
+    asset_ids: list[int] | None = Field(default=None, max_length=MAX_SESSION_ASSETS)
 
     @model_validator(mode="after")
     def check_range(self):
@@ -53,6 +57,12 @@ class SessionOut(BaseModel):
     period_length_days: int | None
     portfolio_id: int
     periods: list[PeriodOut]
+    asset_ids: list[int]
+
+
+class SpeedIn(BaseModel):
+    """Replay steps per real second."""
+    speed: Decimal = Field(ge=MIN_SPEED, le=MAX_SPEED, decimal_places=2)
 
 
 class PositionOut(BaseModel):

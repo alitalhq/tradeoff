@@ -30,6 +30,19 @@ describe("SessionClock", () => {
     expect(screen.getByText("Live")).toBeInTheDocument();
   });
 
+  test("tells the user the clock is waiting for their limits", () => {
+    render(
+      <SessionClock
+        simTime="2019-01-17T21:00:00Z"
+        startAt="2019-01-02T21:00:00Z"
+        endAt="2019-02-01T21:00:00Z"
+        status="awaiting_limits"
+        periods={periods}
+      />,
+    );
+    expect(screen.getByText("Set limits")).toBeInTheDocument();
+  });
+
   test("shows an invitation when no session is open", () => {
     render(<SessionClock />);
     expect(screen.getByText("No session open")).toBeInTheDocument();

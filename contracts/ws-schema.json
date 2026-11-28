@@ -1,5 +1,49 @@
 {
   "$defs": {
+    "AdjustmentMessage": {
+      "properties": {
+        "action_type": {
+          "enum": [
+            "split",
+            "dividend"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "asset_id": {
+          "title": "Asset Id",
+          "type": "integer"
+        },
+        "cash_delta": {
+          "title": "Cash Delta",
+          "type": "string"
+        },
+        "portfolio_id": {
+          "title": "Portfolio Id",
+          "type": "integer"
+        },
+        "qty_delta": {
+          "title": "Qty Delta",
+          "type": "string"
+        },
+        "type": {
+          "const": "adjustment",
+          "default": "adjustment",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "portfolio_id",
+        "asset_id",
+        "action_type",
+        "qty_delta",
+        "cash_delta"
+      ],
+      "title": "AdjustmentMessage",
+      "type": "object"
+    },
     "Bar": {
       "properties": {
         "asset_id": {
@@ -91,6 +135,7 @@
             "created",
             "running",
             "paused",
+            "awaiting_limits",
             "finished"
           ],
           "title": "Status",
@@ -262,6 +307,7 @@
   },
   "discriminator": {
     "mapping": {
+      "adjustment": "#/$defs/AdjustmentMessage",
       "bar": "#/$defs/BarMessage",
       "clock": "#/$defs/ClockMessage",
       "fill": "#/$defs/FillMessage",
@@ -285,6 +331,9 @@
     },
     {
       "$ref": "#/$defs/PeriodMessage"
+    },
+    {
+      "$ref": "#/$defs/AdjustmentMessage"
     }
   ]
 }

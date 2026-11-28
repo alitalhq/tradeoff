@@ -27,6 +27,11 @@ const REASONS: Record<string, string> = {
   order_time_mismatch: "The session clock moved while the order was sent. Place it again.",
   period_closed: "That period has already ended, so its limits can't change.",
   portfolio_not_found: "This session has no portfolio for you.",
+  limits_required: "Set your limits for this period before the clock can move.",
+  session_finished: "This session has ended.",
+  not_replay: "Only time machine sessions have playback controls.",
+  invalid_state: "Pause the session before stepping.",
+  asset_not_in_session: "This stock is not part of the session.",
 };
 
 const STATUS_FALLBACK: Record<number, string> = {

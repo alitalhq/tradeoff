@@ -7,6 +7,9 @@ from app.market.models import Bar, NewsItem
 from app.types import Money
 
 
+SessionStatus = Literal["created", "running", "paused", "awaiting_limits", "finished"]
+
+
 class _Message(BaseModel):
     # Serialized messages always carry their `type`, so the schema marks it required.
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
@@ -15,7 +18,7 @@ class _Message(BaseModel):
 class ClockMessage(_Message):
     type: Literal["clock"] = "clock"
     sim_time: datetime
-    status: Literal["created", "running", "paused", "finished"]
+    status: SessionStatus
 
 
 class BarMessage(_Message):
@@ -45,8 +48,17 @@ class PeriodMessage(_Message):
     awaiting_limits: bool
 
 
+class AdjustmentMessage(_Message):
+    type: Literal["adjustment"] = "adjustment"
+    portfolio_id: int
+    asset_id: int
+    action_type: Literal["split", "dividend"]
+    qty_delta: Money
+    cash_delta: Money
+
+
 ServerMessage = Annotated[
-    Union[ClockMessage, BarMessage, NewsMessage, FillMessage, PeriodMessage],
+    Union[ClockMessage, BarMessage, NewsMessage, FillMessage, PeriodMessage, AdjustmentMessage],
     Field(discriminator="type"),
 ]
 server_message_adapter: TypeAdapter = TypeAdapter(ServerMessage)
