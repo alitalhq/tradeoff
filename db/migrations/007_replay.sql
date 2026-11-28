@@ -97,7 +97,9 @@ FROM ledger
 GROUP BY portfolio_id, asset_id
 HAVING sum(qty) > 0;
 
--- Apply every split/dividend effective in (p_from, p_to] to each portfolio of the session holding it.
+-- Apply every split/dividend effective in (p_from, p_to] to each portfolio of the session holding it
+-- at the effective instant. Holdings come from fills before effective_at plus earlier splits, so the
+-- result does not depend on whether a tick filled orders before or after calling this.
 CREATE FUNCTION apply_corporate_actions(p_session_id bigint, p_from timestamptz, p_to timestamptz)
 RETURNS SETOF corporate_action_applied
 LANGUAGE plpgsql AS $$
@@ -113,15 +115,33 @@ BEGIN
         ORDER BY ca.effective_at, ca.id
     LOOP
         RETURN QUERY
+        WITH held AS (
+            SELECT portfolio_id, sum(qty) AS qty
+            FROM (
+                SELECT o.portfolio_id, CASE WHEN o.side = 'buy' THEN f.quantity ELSE -f.quantity END AS qty
+                FROM fill f
+                JOIN trade_order o ON o.id = f.order_id
+                JOIN portfolio p ON p.id = o.portfolio_id
+                WHERE p.session_id = p_session_id AND o.asset_id = act.asset_id
+                  AND f.filled_at_sim < act.effective_at
+                UNION ALL
+                SELECT ap.portfolio_id, ap.qty_delta
+                FROM corporate_action_applied ap
+                JOIN corporate_action ca ON ca.id = ap.corporate_action_id
+                JOIN portfolio p ON p.id = ap.portfolio_id
+                WHERE p.session_id = p_session_id AND ca.asset_id = act.asset_id
+                  AND ca.action_type = 'split' AND ca.effective_at <= act.effective_at
+            ) ledger
+            GROUP BY portfolio_id
+            HAVING sum(qty) > 0
+        )
         INSERT INTO corporate_action_applied (portfolio_id, corporate_action_id, applied_at_sim,
                                               qty_delta, cash_delta)
-        SELECT pos.portfolio_id, act.id, act.effective_at,
-               CASE WHEN act.action_type = 'split' THEN round(pos.net_qty * (act.ratio - 1), 4) ELSE 0 END,
-               CASE WHEN act.action_type = 'dividend' THEN floor(pos.net_qty * act.amount * 100) / 100 ELSE 0 END
-        FROM position pos
-        JOIN portfolio p ON p.id = pos.portfolio_id
-        WHERE p.session_id = p_session_id AND pos.asset_id = act.asset_id
-        ORDER BY pos.portfolio_id
+        SELECT h.portfolio_id, act.id, act.effective_at,
+               CASE WHEN act.action_type = 'split' THEN round(h.qty * (act.ratio - 1), 4) ELSE 0 END,
+               CASE WHEN act.action_type = 'dividend' THEN floor(h.qty * act.amount * 100) / 100 ELSE 0 END
+        FROM held h
+        ORDER BY h.portfolio_id
         ON CONFLICT (portfolio_id, corporate_action_id) DO NOTHING
         RETURNING *;
     END LOOP;

@@ -151,3 +151,12 @@ def test_order_inside_universe_accepted(db, setup):
 
 def test_empty_universe_is_unrestricted(db, setup):
     make_order(db, setup["portfolio"], setup["asset"], "buy", 1, T0)
+
+
+def test_holdings_counted_as_of_effective_time(db, setup):
+    buy(db, setup["portfolio"], setup["asset"], 3, "100", T0)
+    action_at = T0 + timedelta(hours=1)
+    buy(db, setup["portfolio"], setup["asset"], 5, "100", T1)
+    make_dividend(db, setup["asset"], action_at, "1")
+    rows = apply_actions(db, setup["session"], T0, T2)
+    assert rows[0]["cash_delta"] == Decimal("3.00")

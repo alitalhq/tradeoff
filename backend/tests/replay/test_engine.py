@@ -177,3 +177,22 @@ def test_universe_limits_bars(db, s):
     result = advance(db, s["session"])
     assert result.sim_time == tue_end
     assert [m.asset_id for m in result.messages if m.type == "bar"] == [s["asset"]]
+
+
+def test_fill_before_split_in_same_tick_is_adjusted(db, s):
+    make_order(db, s["portfolio"], s["asset"], "buy", 2, MON)
+    bar(db, s["asset"], MON, price=100)
+    make_split(db, s["asset"], MON + OPEN + timedelta(hours=2), 2)
+    result = advance(db, s["session"])
+    adj = [m for m in result.messages if m.type == "adjustment"][0]
+    assert adj.qty_delta == Decimal("2")
+    pos = db.execute("SELECT net_qty, avg_cost FROM position WHERE portfolio_id = %s", (s["portfolio"],)).fetchone()
+    assert pos["net_qty"] == Decimal("4") and pos["avg_cost"] == Decimal("50")
+
+
+def test_fill_at_split_open_is_not_adjusted(db, s):
+    make_order(db, s["portfolio"], s["asset"], "buy", 2, MON)
+    bar(db, s["asset"], MON, price=50)
+    make_split(db, s["asset"], MON + OPEN, 2)
+    result = advance(db, s["session"])
+    assert "adjustment" not in types(result)

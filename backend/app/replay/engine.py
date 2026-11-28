@@ -70,7 +70,7 @@ WHERE tp.session_id = %(sid)s AND %(at)s >= tp.starts_at AND %(at)s < tp.ends_at
 """
 
 
-def _missing_limit(conn: psycopg.Connection, session_id: int, at: datetime) -> dict | None:
+def missing_limit(conn: psycopg.Connection, session_id: int, at: datetime) -> dict | None:
     return conn.execute(MISSING_LIMIT_SQL, {"sid": session_id, "at": at}).fetchone()
 
 
@@ -92,7 +92,7 @@ def advance(conn: psycopg.Connection, session_id: int, *, manual: bool = False) 
         return TickResult(s["status"], s["sim_time"], s["speed"], [])
 
     old = s["sim_time"]
-    blocked = _missing_limit(conn, session_id, old)
+    blocked = missing_limit(conn, session_id, old)
     if blocked is not None:
         if manual:
             raise ReplayError("limits_required")
@@ -107,11 +107,12 @@ def advance(conn: psycopg.Connection, session_id: int, *, manual: bool = False) 
     new = min(t for t in candidates if t is not None)
     conn.execute("UPDATE sim_session SET sim_time = %s WHERE id = %s", (new, session_id))
 
+    # Fills first: each corporate action then counts holdings as of its own effective instant.
+    fills = fill_pending_orders(conn, session_id)
     adjustments = conn.execute(
         "SELECT ap.*, ca.asset_id, ca.action_type FROM apply_corporate_actions(%s, %s, %s) ap "
         "JOIN corporate_action ca ON ca.id = ap.corporate_action_id", (session_id, old, new),
     ).fetchall()
-    fills = fill_pending_orders(conn, session_id)
 
     window = {"sid": session_id, "tf": s["bar_timeframe"], "old": old, "new": new}
     bars = conn.execute(BARS_SQL, window).fetchall()
@@ -126,7 +127,7 @@ def advance(conn: psycopg.Connection, session_id: int, *, manual: bool = False) 
     if new >= s["end_at"]:
         status = "finished"
     elif started is not None:
-        awaiting = _missing_limit(conn, session_id, new) is not None
+        awaiting = missing_limit(conn, session_id, new) is not None
         period_messages.append(_period_message(started, awaiting))
         if awaiting and not manual:
             status = "awaiting_limits"
