@@ -1,8 +1,8 @@
 /* Generated from contracts/ws-schema.json. Do not edit. */
 
-export type WsSchema = ClockMessage | BarMessage | NewsMessage | FillMessage | PeriodMessage;
+export type WsSchema = ClockMessage | BarMessage | NewsMessage | FillMessage | PeriodMessage | AdjustmentMessage;
 export type SimTime = string;
-export type Status = "created" | "running" | "paused" | "finished";
+export type Status = "created" | "running" | "paused" | "awaiting_limits" | "finished";
 export type Type = "clock";
 export type AssetId = number;
 export type AssetId1 = number;
@@ -32,6 +32,12 @@ export type EndsAt = string;
 export type PeriodNo = number;
 export type StartsAt = string;
 export type Type4 = "period";
+export type ActionType = "split" | "dividend";
+export type AssetId2 = number;
+export type CashDelta = string;
+export type PortfolioId = number;
+export type QtyDelta = string;
+export type Type5 = "adjustment";
 
 export interface ClockMessage {
   sim_time: SimTime;
@@ -79,4 +85,12 @@ export interface PeriodMessage {
   period_no: PeriodNo;
   starts_at: StartsAt;
   type: Type4;
+}
+export interface AdjustmentMessage {
+  action_type: ActionType;
+  asset_id: AssetId2;
+  cash_delta: CashDelta;
+  portfolio_id: PortfolioId;
+  qty_delta: QtyDelta;
+  type: Type5;
 }
