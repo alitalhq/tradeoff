@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import market, orders, sessions
+from app.api import market, orders, replay, sessions
 from app.config import get_settings
 from app.db import connect
 from app.replay.runner import runner
@@ -24,6 +24,7 @@ app = FastAPI(title="TradeOff", version="0.1.0", lifespan=lifespan)
 app.include_router(sessions.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(market.router, prefix="/api")
+app.include_router(replay.router, prefix="/api")
 app.include_router(ws_routes.router)
 
 

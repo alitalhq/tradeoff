@@ -1,11 +1,12 @@
 from datetime import timedelta
 
 import psycopg
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from app.api.deps import Conn
 from app.api.schemas import PeriodLimitIn, PortfolioOut, SessionCreate, SessionOut
 from app.auth.deps import get_current_user
+from app.replay.runner import runner
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -27,6 +28,9 @@ def load_session(conn: psycopg.Connection, session_id: int, user_id: int) -> dic
         "SELECT period_no, starts_at, ends_at FROM trading_period WHERE session_id = %s ORDER BY period_no",
         (session_id,),
     ).fetchall()
+    row["asset_ids"] = [r["asset_id"] for r in conn.execute(
+        "SELECT asset_id FROM session_asset WHERE session_id = %s ORDER BY asset_id", (session_id,)
+    ).fetchall()]
     return row
 
 
@@ -40,6 +44,16 @@ def create_session(*, body: SessionCreate, user_id: int = Depends(get_current_us
          body.initial_cash, body.period_length_days),
     ).fetchone()["id"]
     conn.execute("INSERT INTO portfolio (session_id, user_id) VALUES (%s, %s)", (session_id, user_id))
+
+    asset_ids = sorted(set(body.asset_ids or []))
+    if asset_ids:
+        known = conn.execute("SELECT count(*) AS n FROM asset WHERE id = ANY(%s)", (asset_ids,)).fetchone()["n"]
+        if known != len(asset_ids):
+            raise HTTPException(status_code=404, detail="asset not found")
+        conn.execute(
+            "INSERT INTO session_asset (session_id, asset_id) SELECT %s, unnest(%s::bigint[])",
+            (session_id, asset_ids),
+        )
 
     if body.period_length_days and body.end_at:
         # Bounded by SessionCreate validation (MAX_PERIODS); the last period is cut at end_at.
@@ -76,11 +90,11 @@ def get_portfolio(*, session_id: int, user_id: int = Depends(get_current_user), 
 
 
 @router.put("/{session_id}/periods/{period_no}/limit", status_code=status.HTTP_204_NO_CONTENT)
-def set_period_limit(*, session_id: int, period_no: int, body: PeriodLimitIn,
+def set_period_limit(*, session_id: int, period_no: int, body: PeriodLimitIn, background: BackgroundTasks,
                      user_id: int = Depends(get_current_user), conn: Conn):
     session = load_session(conn, session_id, user_id)
     period = conn.execute(
-        "SELECT id, ends_at FROM trading_period WHERE session_id = %s AND period_no = %s",
+        "SELECT id, starts_at, ends_at FROM trading_period WHERE session_id = %s AND period_no = %s",
         (session_id, period_no),
     ).fetchone()
     if period is None:
@@ -94,3 +108,11 @@ def set_period_limit(*, session_id: int, period_no: int, body: PeriodLimitIn,
         "max_sell_amount = EXCLUDED.max_sell_amount, max_orders = EXCLUDED.max_orders, set_at = now()",
         (session["portfolio_id"], period["id"], body.max_buy_amount, body.max_sell_amount, body.max_orders),
     )
+    # The clock was waiting at this period's start: setting its limit lets it run again.
+    resumed = conn.execute(
+        "UPDATE sim_session SET status = 'running' WHERE id = %s AND status = 'awaiting_limits' "
+        "AND sim_time >= %s AND sim_time < %s RETURNING id",
+        (session_id, period["starts_at"], period["ends_at"]),
+    ).fetchone()
+    if resumed is not None:
+        background.add_task(runner.ensure, session_id)

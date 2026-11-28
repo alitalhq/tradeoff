@@ -101,3 +101,31 @@ export function useSetPeriodLimit(sessionId: number) {
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.session(sessionId) }),
   });
 }
+
+type ReplayAction = "play" | "pause" | "step";
+
+function useReplayAction(sessionId: number, action: ReplayAction) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      unwrap(api.POST(`/api/sessions/{session_id}/${action}`, { params: { path: { session_id: sessionId } } })),
+    onSuccess: (session) => {
+      client.setQueryData(queryKeys.session(sessionId), session);
+      // A step can fill orders and apply splits, so everything under the session may be stale.
+      if (action === "step") client.invalidateQueries({ queryKey: queryKeys.session(sessionId) });
+    },
+  });
+}
+
+export const usePlay = (sessionId: number) => useReplayAction(sessionId, "play");
+export const usePause = (sessionId: number) => useReplayAction(sessionId, "pause");
+export const useStep = (sessionId: number) => useReplayAction(sessionId, "step");
+
+export function useSetSpeed(sessionId: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (speed: string) =>
+      unwrap(api.PUT("/api/sessions/{session_id}/speed", { params: { path: { session_id: sessionId } }, body: { speed } })),
+    onSuccess: (session) => client.setQueryData(queryKeys.session(sessionId), session),
+  });
+}

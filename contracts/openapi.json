@@ -399,6 +399,21 @@
       },
       "SessionCreate": {
         "properties": {
+          "asset_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 200,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Ids"
+          },
           "bar_timeframe": {
             "enum": [
               "1m",
@@ -455,7 +470,8 @@
           "speed": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
+                "maximum": 20.0,
+                "minimum": 0.1,
                 "type": "number"
               },
               {
@@ -482,6 +498,13 @@
       },
       "SessionOut": {
         "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Asset Ids",
+            "type": "array"
+          },
           "bar_timeframe": {
             "enum": [
               "1m",
@@ -568,9 +591,33 @@
           "initial_cash",
           "period_length_days",
           "portfolio_id",
-          "periods"
+          "periods",
+          "asset_ids"
         ],
         "title": "SessionOut",
+        "type": "object"
+      },
+      "SpeedIn": {
+        "description": "Replay steps per real second.",
+        "properties": {
+          "speed": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 0.1,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Speed"
+          }
+        },
+        "required": [
+          "speed"
+        ],
+        "title": "SpeedIn",
         "type": "object"
       },
       "ValidationError": {
@@ -986,6 +1033,51 @@
         ]
       }
     },
+    "/api/sessions/{session_id}/pause": {
+      "post": {
+        "operationId": "pause_api_sessions__session_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "The session cannot do this right now"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause",
+        "tags": [
+          "replay"
+        ]
+      }
+    },
     "/api/sessions/{session_id}/periods/{period_no}/limit": {
       "put": {
         "operationId": "set_period_limit_api_sessions__session_id__periods__period_no__limit_put",
@@ -1040,6 +1132,51 @@
         ]
       }
     },
+    "/api/sessions/{session_id}/play": {
+      "post": {
+        "operationId": "play_api_sessions__session_id__play_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "The session cannot do this right now"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Play",
+        "tags": [
+          "replay"
+        ]
+      }
+    },
     "/api/sessions/{session_id}/portfolio": {
       "get": {
         "operationId": "get_portfolio_api_sessions__session_id__portfolio_get",
@@ -1079,6 +1216,106 @@
         "summary": "Get Portfolio",
         "tags": [
           "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/speed": {
+      "put": {
+        "operationId": "set_speed_api_sessions__session_id__speed_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeedIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "The session cannot do this right now"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Speed",
+        "tags": [
+          "replay"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/step": {
+      "post": {
+        "operationId": "step_api_sessions__session_id__step_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "The session cannot do this right now"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Step",
+        "tags": [
+          "replay"
         ]
       }
     },
