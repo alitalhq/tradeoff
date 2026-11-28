@@ -4,7 +4,7 @@ import { NavLink, Outlet } from "react-router";
 import type { Schemas } from "../api/client";
 import { queryKeys, useSession } from "../api/hooks";
 import { useSessionSocket } from "../api/ws";
-import { SessionClock } from "../components/SessionClock";
+import { SessionClock, type SessionStatus } from "../components/SessionClock";
 import { useActiveSession } from "../session/ActiveSession";
 import { DevUserSwitcher } from "./DevUserSwitcher";
 import { ThemeToggle } from "./ThemeToggle";
@@ -32,7 +32,7 @@ function LiveSessionClock({ sessionId }: { sessionId: number }) {
       simTime={data?.sim_time}
       startAt={data?.start_at}
       endAt={data?.end_at}
-      status={data?.status as "created" | "running" | "paused" | "finished" | undefined}
+      status={data?.status as SessionStatus | undefined}
       periods={data?.periods}
     />
   );

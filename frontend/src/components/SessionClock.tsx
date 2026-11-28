@@ -10,11 +10,19 @@ interface SessionClockProps {
   simTime?: string;
   startAt?: string;
   endAt?: string | null;
-  status?: "created" | "running" | "paused" | "finished";
+  status?: SessionStatus;
   periods?: Period[];
 }
 
-const STATUS_LABEL = { created: "Ready", running: "Running", paused: "Paused", finished: "Finished" } as const;
+const STATUS_LABEL = {
+  created: "Ready",
+  running: "Running",
+  paused: "Paused",
+  awaiting_limits: "Set limits",
+  finished: "Finished",
+} as const;
+
+export type SessionStatus = keyof typeof STATUS_LABEL;
 
 /**
  * The session clock: the date the user is trading on, and for replays a rail from start to end
