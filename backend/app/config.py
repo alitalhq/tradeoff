@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     app_env: Literal["dev", "test", "prod"] = "prod"
     credential_key: str = ""
     migrations_dir: str = ""
+    # None means "on everywhere except tests"; set explicitly to override.
+    replay_runner_enabled: bool | None = None
+
+    @property
+    def runner_enabled(self) -> bool:
+        if self.replay_runner_enabled is not None:
+            return self.replay_runner_enabled
+        return self.app_env != "test"
 
 
 @lru_cache
